@@ -15,6 +15,9 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy:
     environment:
@@ -27,20 +30,20 @@ jobs:
 
       - name: Generate files.json manifest
         run: |
-          python3 - <<'EOF'
-          import os, json
+          python3 << 'PYEOF'
+          import os, json, sys
 
           IGNORE = {'.git', '.github', 'node_modules', '.DS_Store'}
 
           def build_tree(root):
               tree = {}
-              for dirpath, dirnames, filenames in os.walk(root):
-                  # Prune ignored dirs in-place so os.walk skips them
+              for dirpath, dirnames, filenames in os.walk(root, topdown=True):
                   dirnames[:] = sorted(d for d in dirnames if d not in IGNORE)
-                  filenames = sorted(f for f in filenames if f not in IGNORE)
+                  filenames   = sorted(f for f in filenames if f not in IGNORE and f != 'files.json')
 
                   rel = os.path.relpath(dirpath, root)
-                  rel = '' if rel == '.' else rel
+                  if rel == '.':
+                      rel = ''
 
                   node = tree
                   if rel:
@@ -53,17 +56,27 @@ jobs:
                           'size': os.path.getsize(os.path.join(dirpath, f))
                       }
                       for f in filenames
-                      if f != 'files.json'
                   ]
-
               return tree
 
           tree = build_tree('.')
-          with open('files.json', 'w') as fh:
+          out_path = os.path.join('.', 'files.json')
+          with open(out_path, 'w') as fh:
               json.dump(tree, fh, separators=(',', ':'))
 
-          print('files.json written')
-          EOF
+          size = os.path.getsize(out_path)
+          print(f"files.json written ({size} bytes)")
+          sys.exit(0)
+          PYEOF
+
+      - name: Verify files.json exists
+        run: |
+          if [ ! -f files.json ]; then
+            echo "ERROR: files.json was not created!"
+            exit 1
+          fi
+          echo "files.json OK — $(wc -c < files.json) bytes"
+          echo "Root keys: $(python3 -c "import json; d=json.load(open('files.json')); print(list(d.keys())[:10])")"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
