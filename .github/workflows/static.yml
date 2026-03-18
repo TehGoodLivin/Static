@@ -22,48 +22,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Force Node.js 24 for actions
-        run: echo "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true" >> $GITHUB_ENV
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate files.json and disable Jekyll
+      - name: Generate files.json
         run: |
           touch .nojekyll
-
-          python3 << 'PYEOF'
-          import os, json
-
-          IGNORE = {'.git', '.github', 'node_modules', '.DS_Store'}
-
-          def build_tree(root):
-              tree = {}
-              for dirpath, dirnames, filenames in os.walk(root, topdown=True):
-                  dirnames[:] = sorted(d for d in dirnames if d not in IGNORE)
-                  filenames   = sorted(f for f in filenames if f not in IGNORE and f != 'files.json')
-
-                  rel = os.path.relpath(dirpath, root)
-                  if rel == '.':
-                      rel = ''
-
-                  node = tree
-                  if rel:
-                      for part in rel.replace('\\', '/').split('/'):
-                          node = node.setdefault(part, {})
-
-                  node['__files__'] = [
-                      {'name': f, 'size': os.path.getsize(os.path.join(dirpath, f))}
-                      for f in filenames
-                  ]
-              return tree
-
-          tree = build_tree('.')
-          with open('files.json', 'w') as fh:
-              json.dump(tree, fh, separators=(',', ':'))
-
-          print(f"files.json written ({os.path.getsize('files.json')} bytes)")
-          PYEOF
+          python3 generate_manifest.py
 
       - name: Verify
         run: |
