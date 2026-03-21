@@ -4,7 +4,7 @@ import os
 import json
 
 IGNORE_DIRS = {".git"}
-IGNORE_FILES = {"LICENSE", "README.md"}
+IGNORE_FILES = {"LICENSE", "README.md", "generate_manifest.py", "index.html"}
 
 
 def build_tree(root):
